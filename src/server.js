@@ -491,9 +491,10 @@ class TaiXiuExpertAnalyzerV3 {
   }
 
   expertAnalysisV3(sessions, sessionId) {
-    if (sessionId && this.lastSessionId === sessionId && this.cachedAnalysis) {
-      return this.cachedAnalysis;
-    }
+    // Tạm tắt cache để đảm bảo luôn phân tích lại khi debug
+    // if (sessionId && this.lastSessionId === sessionId && this.cachedAnalysis) {
+    //   return this.cachedAnalysis;
+    // }
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
     const quantum = this.quantumPredictV3(sessions);
     const streak = this.analyzeStreak(history);
@@ -547,10 +548,13 @@ app.get('/api/analyze', async (req, res) => {
   }
 
   try {
-    const rawSessions = Object.values(result.data);
-    const sessions = rawSessions.filter(s => s && Array.isArray(s.dices));
-    const lastKey = Object.keys(result.data).pop();
-    const recentSessions = sessions.slice(-100);
+    const entries = Object.entries(result.data);
+    const validEntries = entries.filter(([key, value]) => value && Array.isArray(value.dices));
+    
+    if (validEntries.length === 0) throw new Error("Không có dữ liệu hợp lệ");
+
+    const [lastKey, lastSession] = validEntries[validEntries.length - 1];
+    const recentSessions = validEntries.slice(-100).map(([k, v]) => v);
     
     const analysis = analyzer.expertAnalysisV3(recentSessions, lastKey);
     
@@ -577,18 +581,24 @@ app.get('/68gblon', async (req, res) => {
   }
 
   try {
-    const keys = Object.keys(result.data);
-    const rawSessions = Object.values(result.data);
-    const sessions = rawSessions.filter(s => s && Array.isArray(s.dices));
-    const recentSessions = sessions.slice(-100);
+    const entries = Object.entries(result.data);
+    const validEntries = entries.filter(([key, value]) => value && Array.isArray(value.dices));
     
-    const lastKey = keys[keys.length - 1];
-    const lastSession = sessions[sessions.length - 1];
+    if (validEntries.length === 0) {
+      return res.status(200).json({ message: "Chưa có dữ liệu hợp lệ để hiển thị" });
+    }
+
+    const [lastKey, lastSession] = validEntries[validEntries.length - 1];
+    const recentSessions = validEntries.slice(-100).map(([k, v]) => v);
     
     const analysis = analyzer.expertAnalysisV3(recentSessions, lastKey);
     
+    // Chỉ lấy 50 phiên gần nhất cho json_api để tránh quá tải
+    const jsonApiData = {};
+    validEntries.slice(-50).forEach(([k, v]) => jsonApiData[k] = v);
+
     res.json({
-      "json_api": result.data,
+      "json_api": jsonApiData,
       "phien": lastKey,
       "ket_qua_xuc_xac": lastSession.dices,
       "phien_hien_tai": lastSession,
