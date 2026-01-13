@@ -56,7 +56,7 @@ class TaiXiuExpertAnalyzerV3 {
       entropy: 0.07, deepLearning: 0.12, harmonicResonance: 0.08,
       chaosTheory: 0.05, bayesianNetwork: 0.07, monteCarlo: 0.08,
       reinforcementLearning: 0.15,
-      knn: 0.14, rsi: 0.09 // Thêm trọng số cho thuật toán mới
+      knn: 0.14, rsi: 0.09
     };
     this.lastSessionId = null;
     this.cachedAnalysis = null;
@@ -294,18 +294,16 @@ class TaiXiuExpertAnalyzerV3 {
   // 1. K-Nearest Neighbors (KNN) - Tìm mẫu hình tương đồng trong quá khứ
   analyzeKNN(sessions) {
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
-    const k = 5; // Số lượng hàng xóm gần nhất
-    const patternLength = 7; // Độ dài chuỗi cần so sánh
+    const k = 5;
+    const patternLength = 7;
     
     if (history.length < patternLength + 1) return { prediction: null, confidence: 50 };
 
     const currentPattern = history.slice(-patternLength).join('');
     let matches = [];
 
-    // Quét toàn bộ lịch sử
     for (let i = 0; i < history.length - patternLength - 1; i++) {
       const slice = history.slice(i, i + patternLength).join('');
-      // Tính độ tương đồng (Hamming distance đơn giản hóa)
       if (slice === currentPattern) {
         matches.push(history[i + patternLength]);
       }
@@ -346,7 +344,7 @@ class TaiXiuExpertAnalyzerV3 {
     const avgGain = gains / period;
     const avgLoss = losses / period;
     
-    if (avgLoss === 0) return { rsi: 100, prediction: 'Xỉu', confidence: 85 }; // Quá mua -> Đánh Xỉu
+    if (avgLoss === 0) return { rsi: 100, prediction: 'Xỉu', confidence: 85 };
     
     const rs = avgGain / avgLoss;
     const rsi = 100 - (100 / (1 + rs));
@@ -354,8 +352,6 @@ class TaiXiuExpertAnalyzerV3 {
     let prediction = null;
     let confidence = 50;
 
-    // RSI > 70: Quá mua (Overbought) -> Xu hướng đảo chiều về Xỉu
-    // RSI < 30: Quá bán (Oversold) -> Xu hướng đảo chiều về Tài
     if (rsi > 70) {
       prediction = 'Xỉu';
       confidence = 75 + (rsi - 70);
@@ -627,10 +623,6 @@ class TaiXiuExpertAnalyzerV3 {
   }
 
   expertAnalysisV3(sessions, sessionId) {
-    // Tạm tắt cache để đảm bảo luôn phân tích lại khi debug
-    // if (sessionId && this.lastSessionId === sessionId && this.cachedAnalysis) {
-    //   return this.cachedAnalysis;
-    // }
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
     const quantum = this.quantumPredictV3(sessions);
     const streak = this.analyzeStreak(history);
@@ -638,7 +630,6 @@ class TaiXiuExpertAnalyzerV3 {
     const reasoning = this.getExpertReasoning(quantum, streak);
     
     let loaiCau = [];
-    // Thêm các loại cầu đặc biệt vừa phát hiện
     loaiCau.push(...specialBridges);
 
     if (streak.length >= 4) loaiCau.push(`Cầu Bệt ${streak.type} (${streak.length})`);
@@ -733,7 +724,6 @@ app.get('/68gblon', async (req, res) => {
     const validEntries = entries.filter(([key, value]) => value && Array.isArray(value.dices));
     
     if (validEntries.length === 0) {
-      // Fallback: Hiển thị dữ liệu gốc để debug nếu không tìm thấy dices
       const debugData = {};
       entries.slice(-20).forEach(([k, v]) => debugData[k] = v);
       return res.json({ 
@@ -746,16 +736,13 @@ app.get('/68gblon', async (req, res) => {
     const recentSessions = validEntries.slice(-100).map(([k, v]) => v);
     
     const analysis = analyzer.expertAnalysisV3(recentSessions, lastKey);
-    
-    // Chỉ lấy 50 phiên gần nhất cho json_api để tránh quá tải
-    const jsonApiData = {};
-    validEntries.slice(-50).forEach(([k, v]) => jsonApiData[k] = v);
 
     res.json({
       "phiên": lastKey,
       "kết quả xúc xắc": lastSession.dices,
       "phiên hiện tại": lastSession,
       "dự đoán": analysis.prediction,
+      "pattern": analysis.details.neuralPattern.pattern || "N/A",
       "loại cầu": analysis.loaiCau,
       "id": "@sewdangcap"
     });
