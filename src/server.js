@@ -1,7 +1,8 @@
-// server.js - Deploy lên Render với AI Chuyên Gia
+// server.js - Deploy lên Render với AI Chuyên Gia (Full Tiếng Việt)
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,24 +10,83 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// =============== CẤU HÌNH PROXY ===============
+const PROXY_CONFIG = {
+  enabled: false, // Bật/tắt proxy
+  proxies: [
+    // Thêm proxy của bạn vào đây
+    // 'http://proxy1.example.com:8080',
+    // 'http://proxy2.example.com:3128',
+  ],
+  currentIndex: 0,
+  timeout: 15000
+};
+
 const FIREBASE_URL = 'https://gbmd5-4a69a-default-rtdb.asia-southeast1.firebasedatabase.app/taixiu_sessions.json';
+
+// =============== HÀM LẤY PROXY ===============
+function getNextProxy() {
+  if (!PROXY_CONFIG.enabled || PROXY_CONFIG.proxies.length === 0) {
+    return null;
+  }
+  const proxy = PROXY_CONFIG.proxies[PROXY_CONFIG.currentIndex];
+  PROXY_CONFIG.currentIndex = (PROXY_CONFIG.currentIndex + 1) % PROXY_CONFIG.proxies.length;
+  return proxy;
+}
+
+// =============== HÀM LẤY DỮ LIỆU ===============
+async function fetchData(maxRetries = 3) {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Lần thử ${attempt}/${maxRetries}...`);
+      
+      const config = {
+        timeout: PROXY_CONFIG.timeout,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      };
+      
+      if (PROXY_CONFIG.enabled && PROXY_CONFIG.proxies.length > 0) {
+        const proxyUrl = getNextProxy();
+        console.log(`🔗 Proxy: ${proxyUrl}`);
+        config.httpsAgent = new HttpsProxyAgent(proxyUrl);
+        config.httpAgent = new HttpsProxyAgent(proxyUrl);
+      }
+      
+      const response = await axios.get(FIREBASE_URL, config);
+      
+      if (response.data && Object.keys(response.data).length > 0) {
+        console.log(`✅ Thành công! Số phiên: ${Object.keys(response.data).length}`);
+        return { success: true, data: response.data };
+      }
+      
+    } catch (error) {
+      lastError = error;
+      console.log(`❌ Lỗi: ${error.message}`);
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+      }
+    }
+  }
+  
+  return { success: false, error: lastError?.message };
+}
 
 // =============== CHUYÊN GIA PHÂN TÍCH TÀI XỈU ===============
 class TaiXiuExpertAnalyzer {
   constructor() {
-    this.expertLevel = 'MASTER'; // 10+ năm kinh nghiệm
+    this.expertLevel = 'MASTER';
     this.algorithms = {
-      // Thuật toán cơ bản
       basic: ['streak', 'zigzag', 'double', 'balance'],
-      // Thuật toán nâng cao
       advanced: ['fibonacci', 'golden_ratio', 'wave_theory', 'probability_matrix'],
-      // Thuật toán chuyên gia
       expert: ['neural_pattern', 'momentum_shift', 'entropy_analysis', 'quantum_prediction']
     };
   }
 
-  // ========== THUẬT TOÁN CƠ BẢN ==========
-  
   calculateTotal(dices) {
     return dices.reduce((sum, dice) => sum + dice, 0);
   }
@@ -35,7 +95,6 @@ class TaiXiuExpertAnalyzer {
     return total >= 11 ? 'Tài' : 'Xỉu';
   }
 
-  // Phân tích chuỗi streak
   analyzeStreak(history) {
     if (history.length === 0) return { type: null, length: 0 };
     
@@ -53,7 +112,6 @@ class TaiXiuExpertAnalyzer {
     return { type: streakType, length: currentStreak };
   }
 
-  // Phân tích zigzag
   analyzeZigzag(history) {
     if (history.length < 4) return { active: false, strength: 0 };
     
@@ -72,9 +130,6 @@ class TaiXiuExpertAnalyzer {
     };
   }
 
-  // ========== THUẬT TOÁN NÂNG CAO ==========
-  
-  // Fibonacci Sequence Analysis
   analyzeFibonacci(sessions) {
     const fibSeq = [1, 1, 2, 3, 5, 8, 13, 21];
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
@@ -109,10 +164,9 @@ class TaiXiuExpertAnalyzer {
     };
   }
 
-  // Golden Ratio Analysis (Tỷ lệ vàng 1.618)
   analyzeGoldenRatio(sessions) {
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
-    const last34 = history.slice(-34); // Fibonacci 34
+    const last34 = history.slice(-34);
     
     const taiCount = last34.filter(h => h === 'Tài').length;
     const xiuCount = 34 - taiCount;
@@ -125,10 +179,10 @@ class TaiXiuExpertAnalyzer {
     let confidence = 0;
     
     if (Math.abs(ratio - goldenRatio) < 0.15) {
-      prediction = 'Xỉu'; // Tài đang chiếm ưu thế → đảo về Xỉu
+      prediction = 'Xỉu';
       confidence = 82;
     } else if (Math.abs(ratio - inverseGolden) < 0.15) {
-      prediction = 'Tài'; // Xỉu đang chiếm ưu thế → đảo về Tài
+      prediction = 'Tài';
       confidence = 82;
     } else if (ratio > 1.3) {
       prediction = 'Xỉu';
@@ -148,12 +202,10 @@ class TaiXiuExpertAnalyzer {
     };
   }
 
-  // Wave Theory - Lý thuyết sóng Elliott
   analyzeWavePattern(sessions) {
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
-    const last13 = history.slice(-13); // Fibonacci 13
+    const last13 = history.slice(-13);
     
-    // Phân tích sóng: Impulse (5 waves) + Correction (3 waves)
     let waves = [];
     let currentWave = { type: last13[0], length: 1 };
     
@@ -180,7 +232,6 @@ class TaiXiuExpertAnalyzer {
     };
   }
 
-  // Probability Matrix - Ma trận xác suất
   buildProbabilityMatrix(sessions) {
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
     const matrix = {
@@ -188,7 +239,7 @@ class TaiXiuExpertAnalyzer {
     };
     
     for (let i = 0; i < history.length - 1; i++) {
-      const current = history[i][0]; // T or X
+      const current = history[i][0];
       const next = history[i + 1][0];
       const key = current + next;
       matrix[key]++;
@@ -224,9 +275,6 @@ class TaiXiuExpertAnalyzer {
     };
   }
 
-  // ========== THUẬT TOÁN CHUYÊN GIA ==========
-  
-  // Neural Pattern Recognition - Nhận dạng pattern bằng mạng neural
   analyzeNeuralPattern(sessions) {
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
     const patterns = {
@@ -234,7 +282,6 @@ class TaiXiuExpertAnalyzer {
       'XTT': 0, 'XTX': 0, 'XXT': 0, 'XXX': 0
     };
     
-    // Học pattern 3 phiên
     for (let i = 0; i < history.length - 3; i++) {
       const pattern = history.slice(i, i + 3).map(h => h[0]).join('');
       const nextResult = history[i + 3];
@@ -246,7 +293,6 @@ class TaiXiuExpertAnalyzer {
       patterns[key + '_next'][nextResult[0]]++;
     }
     
-    // Dự đoán dựa trên pattern hiện tại
     const currentPattern = history.slice(-3).map(h => h[0]).join('');
     const patternData = patterns[currentPattern + '_next'];
     
@@ -272,12 +318,10 @@ class TaiXiuExpertAnalyzer {
     };
   }
 
-  // Momentum Shift Detection - Phát hiện chuyển động lượng
   analyzeMomentumShift(sessions) {
     const totals = sessions.map(s => this.calculateTotal(s.dices));
     const last10 = totals.slice(-10);
     
-    // Tính momentum (sự thay đổi tổng điểm)
     let momentum = 0;
     for (let i = 1; i < last10.length; i++) {
       momentum += (last10[i] - last10[i - 1]);
@@ -287,7 +331,6 @@ class TaiXiuExpertAnalyzer {
     const lastTotal = totals[totals.length - 1];
     const predictedTotal = lastTotal + avgMomentum;
     
-    // Phát hiện điểm đảo chiều
     const isReversal = Math.abs(avgMomentum) > 2;
     const trendStrength = Math.min(Math.abs(avgMomentum) * 10, 100);
     
@@ -302,12 +345,10 @@ class TaiXiuExpertAnalyzer {
     };
   }
 
-  // Entropy Analysis - Phân tích độ hỗn loạn
   analyzeEntropy(sessions) {
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
     const last20 = history.slice(-20);
     
-    // Tính entropy (độ hỗn loạn của chuỗi kết quả)
     let changes = 0;
     for (let i = 1; i < last20.length; i++) {
       if (last20[i] !== last20[i - 1]) {
@@ -316,18 +357,16 @@ class TaiXiuExpertAnalyzer {
     }
     
     const entropy = changes / (last20.length - 1);
-    const isHighEntropy = entropy > 0.6; // Dao động mạnh
-    const isLowEntropy = entropy < 0.3;  // Ổn định
+    const isHighEntropy = entropy > 0.6;
+    const isLowEntropy = entropy < 0.3;
     
     let prediction = null;
     let confidence = 0;
     
     if (isLowEntropy) {
-      // Chuỗi ổn định → Tiếp tục xu hướng
       prediction = last20[last20.length - 1];
       confidence = 73;
     } else if (isHighEntropy) {
-      // Dao động mạnh → Đảo chiều
       prediction = last20[last20.length - 1] === 'Tài' ? 'Xỉu' : 'Tài';
       confidence = 71;
     }
@@ -342,9 +381,7 @@ class TaiXiuExpertAnalyzer {
     };
   }
 
-  // Quantum Prediction - Dự đoán lượng tử (kết hợp tất cả thuật toán)
   quantumPredict(sessions) {
-    const predictions = [];
     const weights = {
       fibonacci: 0.12,
       goldenRatio: 0.15,
@@ -355,7 +392,6 @@ class TaiXiuExpertAnalyzer {
       entropy: 0.12
     };
     
-    // Thu thập tất cả dự đoán
     const fib = this.analyzeFibonacci(sessions);
     const golden = this.analyzeGoldenRatio(sessions);
     const wave = this.analyzeWavePattern(sessions);
@@ -364,7 +400,6 @@ class TaiXiuExpertAnalyzer {
     const momentum = this.analyzeMomentumShift(sessions);
     const entropy = this.analyzeEntropy(sessions);
     
-    // Tính điểm vote có trọng số
     let taiScore = 0;
     let xiuScore = 0;
     
@@ -391,7 +426,7 @@ class TaiXiuExpertAnalyzer {
     
     return {
       prediction: finalPrediction,
-      confidence: Math.min(finalConfidence, 98), // Cap tối đa 98%
+      confidence: Math.min(finalConfidence, 98),
       taiScore: (taiScore * 100).toFixed(1) + '%',
       xiuScore: (xiuScore * 100).toFixed(1) + '%',
       algorithms: {
@@ -406,94 +441,40 @@ class TaiXiuExpertAnalyzer {
     };
   }
 
-  // ========== PHÂN TÍCH CHUYÊN GIA TỔNG HỢP ==========
-  
   expertAnalysis(sessions) {
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
-    const currentSession = sessions[sessions.length - 1];
-    
-    // Chạy tất cả thuật toán
     const quantum = this.quantumPredict(sessions);
     const streak = this.analyzeStreak(history);
     const zigzag = this.analyzeZigzag(history);
     
-    // Xác định loại cầu
     const loaiCau = [];
-    const recommendations = [];
     
     if (streak.length >= 5) {
       loaiCau.push('Cầu Phá Chuỗi Dài');
-      recommendations.push(`Chuỗi ${streak.type} đã kéo dài ${streak.length} phiên - Rủi ro đảo chiều cao`);
     }
     
     if (zigzag.active) {
       loaiCau.push('Cầu Zigzag Dao Động');
-      recommendations.push(`Pattern dao động mạnh ${zigzag.strength.toFixed(0)}% - Khả năng tiếp tục`);
     }
     
     if (quantum.algorithms.goldenRatio.isGoldenRatio) {
       loaiCau.push('Cầu Tỷ Lệ Vàng');
-      recommendations.push('Đạt tỷ lệ vàng 1.618 - Điểm đảo chiều lý tưởng');
     }
     
     if (quantum.algorithms.momentumShift.isReversal) {
       loaiCau.push('Cầu Đảo Momentum');
-      recommendations.push('Phát hiện điểm đảo chiều momentum - Tín hiệu mạnh');
     }
     
     if (quantum.algorithms.neuralPattern.learningDepth > 5) {
       loaiCau.push('Cầu Pattern AI');
-      recommendations.push(`Pattern ${quantum.algorithms.neuralPattern.pattern} xuất hiện ${quantum.algorithms.neuralPattern.learningDepth} lần`);
     }
-    
-    // Đánh giá rủi ro
-    let riskLevel = 'Thấp';
-    if (quantum.confidence < 65) riskLevel = 'Cao';
-    else if (quantum.confidence < 75) riskLevel = 'Trung Bình';
     
     return {
       prediction: quantum.prediction,
       confidence: quantum.confidence,
-      riskLevel,
-      loaiCau: loaiCau.length > 0 ? loaiCau : ['Cầu Thường'],
-      recommendations,
-      expertInsight: this.generateExpertInsight(quantum, streak, sessions),
-      detailedAnalysis: quantum.algorithms,
-      votingBreakdown: {
-        tai: quantum.taiScore,
-        xiu: quantum.xiuScore
-      }
+      pattern: quantum.algorithms.neuralPattern.pattern,
+      loaiCau: loaiCau.length > 0 ? loaiCau : ['Cầu Thường']
     };
-  }
-
-  // Tạo nhận định chuyên gia
-  generateExpertInsight(quantum, streak, sessions) {
-    const insights = [];
-    
-    insights.push(`💡 Phân tích ${sessions.length} phiên gần nhất với 7 thuật toán AI chuyên sâu`);
-    
-    if (quantum.confidence >= 85) {
-      insights.push(`🔥 Tín hiệu CỰC MẠNH: Confidence ${quantum.confidence}% - Khuyến nghị theo dự đoán`);
-    } else if (quantum.confidence >= 75) {
-      insights.push(`✅ Tín hiệu TỐT: Confidence ${quantum.confidence}% - Đáng tin cậy`);
-    } else if (quantum.confidence >= 65) {
-      insights.push(`⚠️ Tín hiệu TRUNG BÌNH: Confidence ${quantum.confidence}% - Cân nhắc kỹ`);
-    } else {
-      insights.push(`❌ Tín hiệu YẾU: Confidence ${quantum.confidence}% - Không khuyến nghị`);
-    }
-    
-    if (streak.length >= 6) {
-      insights.push(`⚡ Cảnh báo: Chuỗi ${streak.type} đã dài ${streak.length} phiên - Nguy cơ đảo chiều rất cao`);
-    }
-    
-    const entropy = quantum.algorithms.entropy;
-    if (entropy.entropyLevel === 'High') {
-      insights.push('🌊 Thị trường đang dao động mạnh - Khó dự đoán, cẩn trọng');
-    } else if (entropy.entropyLevel === 'Low') {
-      insights.push('📊 Thị trường ổn định - Xu hướng rõ ràng');
-    }
-    
-    return insights;
   }
 }
 
@@ -503,13 +484,15 @@ const analyzer = new TaiXiuExpertAnalyzer();
 
 app.get('/api/taixiu', async (req, res) => {
   try {
-    const response = await axios.get(FIREBASE_URL);
-    const data = response.data;
+    const fetchResult = await fetchData();
     
-    if (!data) {
-      return res.status(404).json({ error: 'Không có dữ liệu' });
+    if (!fetchResult.success) {
+      return res.status(503).json({ 
+        loi: 'Không thể kết nối nguồn dữ liệu'
+      });
     }
 
+    const data = fetchResult.data;
     const sessions = Object.entries(data)
       .map(([id, session]) => ({
         id,
@@ -523,130 +506,32 @@ app.get('/api/taixiu', async (req, res) => {
     const expertResult = analyzer.expertAnalysis(sessions);
 
     const result = {
-      success: true,
-      timestamp: new Date().toISOString(),
       id: '@sewdangcap',
-      expert_level: 'MASTER - 10+ Years Experience',
-      data: {
-        phien_hien_tai: {
-          session_id: currentSession.session_id,
-          dices: currentSession.dices,
-          total: currentSession.total,
-          result: currentSession.result
-        },
-        du_doan_chuyen_gia: {
-          prediction: expertResult.prediction,
-          confidence: expertResult.confidence + '%',
-          next_session: currentSession.session_id + 1,
-          risk_level: expertResult.riskLevel
-        },
-        loai_cau: expertResult.loaiCau,
-        khuyen_nghi: expertResult.recommendations,
-        nhan_dinh_chuyen_gia: expertResult.expertInsight,
-        phan_tich_chi_tiet: {
-          voting_breakdown: expertResult.votingBreakdown,
-          fibonacci: expertResult.detailedAnalysis.fibonacci,
-          golden_ratio: expertResult.detailedAnalysis.goldenRatio,
-          wave_theory: expertResult.detailedAnalysis.waveTheory,
-          probability_matrix: expertResult.detailedAnalysis.probabilityMatrix,
-          neural_pattern: expertResult.detailedAnalysis.neuralPattern,
-          momentum_shift: expertResult.detailedAnalysis.momentumShift,
-          entropy: expertResult.detailedAnalysis.entropy
-        },
-        lich_su_10_phien: sessions.slice(-10).map(s => ({
-          session: s.session_id,
-          dices: s.dices,
-          total: s.total,
-          result: s.result
-        }))
-      }
+      phien: currentSession.session_id,
+      xuc_xac: currentSession.dices,
+      ket_qua: currentSession.result,
+      phien_hien_tai: currentSession.session_id,
+      du_doan: expertResult.prediction,
+      pattern: expertResult.pattern,
+      loai_cau: expertResult.loaiCau
     };
 
     res.json(result);
+    
   } catch (error) {
     res.status(500).json({ 
-      success: false,
-      error: 'Lỗi khi lấy dữ liệu',
-      message: error.message 
-    });
-  }
-});
-
-// API phân tích sâu một thuật toán cụ thể
-app.get('/api/taixiu/algorithm/:type', async (req, res) => {
-  try {
-    const { type } = req.params;
-    const response = await axios.get(FIREBASE_URL);
-    const data = response.data;
-    
-    if (!data) {
-      return res.status(404).json({ error: 'Không có dữ liệu' });
-    }
-
-    const sessions = Object.entries(data)
-      .map(([id, session]) => ({
-        id,
-        ...session,
-        total: analyzer.calculateTotal(session.dices),
-        result: analyzer.getTaiXiu(analyzer.calculateTotal(session.dices))
-      }))
-      .sort((a, b) => a.session_id - b.session_id);
-
-    let algorithmResult;
-    
-    switch(type) {
-      case 'fibonacci':
-        algorithmResult = analyzer.analyzeFibonacci(sessions);
-        break;
-      case 'golden':
-        algorithmResult = analyzer.analyzeGoldenRatio(sessions);
-        break;
-      case 'wave':
-        algorithmResult = analyzer.analyzeWavePattern(sessions);
-        break;
-      case 'matrix':
-        algorithmResult = analyzer.buildProbabilityMatrix(sessions);
-        break;
-      case 'neural':
-        algorithmResult = analyzer.analyzeNeuralPattern(sessions);
-        break;
-      case 'momentum':
-        algorithmResult = analyzer.analyzeMomentumShift(sessions);
-        break;
-      case 'entropy':
-        algorithmResult = analyzer.analyzeEntropy(sessions);
-        break;
-      case 'quantum':
-        algorithmResult = analyzer.quantumPredict(sessions);
-        break;
-      default:
-        return res.status(400).json({ error: 'Thuật toán không hợp lệ' });
-    }
-
-    res.json({
-      success: true,
-      algorithm: type,
-      result: algorithmResult
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      error: 'Lỗi khi phân tích',
-      message: error.message 
+      loi: 'Lỗi xử lý dữ liệu'
     });
   }
 });
 
 app.get('/health', (req, res) => {
   res.json({ 
-    status: 'OK', 
-    message: 'Expert AI TàiXỉu API v2.0',
-    algorithms: 7,
-    expert_level: 'MASTER'
+    trang_thai: 'OK', 
+    thong_diep: 'Expert AI TàiXỉu API v2.0'
   });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Expert TàiXỉu API running on port ${PORT}`);
-  console.log(`🧠 AI Algorithms: 7 Advanced + Expert Level`);
+  console.log(`🚀 Expert TàiXỉu API chạy trên port ${PORT}`);
 });
