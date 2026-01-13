@@ -850,6 +850,42 @@ app.get('/api/analyze', async (req, res) => {
   }
 });
 
+app.get('/68gblon', async (req, res) => {
+  const result = await fetchData();
+  
+  if (!result.success) {
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Không thể kết nối đến máy chủ dữ liệu',
+      error: result.error 
+    });
+  }
+
+  try {
+    const keys = Object.keys(result.data);
+    const sessions = Object.values(result.data);
+    const recentSessions = sessions.slice(-100);
+    
+    const lastKey = keys[keys.length - 1];
+    const lastSession = sessions[sessions.length - 1];
+    
+    const analysis = analyzer.expertAnalysisV3(recentSessions);
+    
+    res.json({
+      "json_api": result.data,
+      "phien": lastKey,
+      "ket_qua_xuc_xac": lastSession.dices,
+      "phien_hien_tai": lastSession,
+      "du_doan": analysis.prediction,
+      "pattern": analysis.details.neuralPattern.pattern,
+      "loai_cau": analysis.loaiCau,
+      "id": "@sewdangcap"
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi phân tích', error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server đang chạy tại cổng ${PORT}`);
 });
