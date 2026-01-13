@@ -81,6 +81,7 @@ class TaiXiuExpertAnalyzerV3 {
   }
 
   calculateTotal(dices) {
+    if (!Array.isArray(dices)) return 0;
     return dices.reduce((sum, dice) => sum + dice, 0);
   }
 
@@ -845,7 +846,8 @@ app.get('/api/analyze', async (req, res) => {
 
   try {
     // Chuyển đổi dữ liệu từ object sang array
-    const sessions = Object.values(result.data);
+    const rawSessions = Object.values(result.data);
+    const sessions = rawSessions.filter(s => s && Array.isArray(s.dices));
     const lastKey = Object.keys(result.data).pop();
     // Lấy 100 phiên gần nhất để phân tích
     const recentSessions = sessions.slice(-100);
@@ -876,7 +878,8 @@ app.get('/68gblon', async (req, res) => {
 
   try {
     const keys = Object.keys(result.data);
-    const sessions = Object.values(result.data);
+    const rawSessions = Object.values(result.data);
+    const sessions = rawSessions.filter(s => s && Array.isArray(s.dices));
     const recentSessions = sessions.slice(-100);
     
     const lastKey = keys[keys.length - 1];
