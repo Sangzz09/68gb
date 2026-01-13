@@ -751,13 +751,13 @@ app.get('/68gblon', async (req, res) => {
 
     res.json({
       "json_api": jsonApiData,
-      "phien": lastKey,
-      "ket_qua_xuc_xac": lastSession.dices,
-      "phien_hien_tai": lastSession,
-      "du_doan": analysis.prediction,
+      "phiên": lastKey,
+      "kết quả xúc xắc": lastSession.dices,
+      "phiên hiện tại": lastSession,
+      "dự đoán": analysis.prediction,
       "pattern": analysis.details.neuralPattern.pattern,
-      "loai_cau": analysis.loaiCau,
-      "al_chuyen_gia": analysis.reasoning,
+      "loại cầu": analysis.loaiCau,
+      "al chuyên gia phân tích": analysis.reasoning,
       "id": "@sewdangcap"
     });
   } catch (error) {
