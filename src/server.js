@@ -717,7 +717,7 @@ app.get('/api/analyze', async (req, res) => {
 
 app.get('/68gblon', async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  console.log("⚡ Đang xử lý request /68gblon (Phiên bản Tiếng Việt)...");
+  console.log("⚡ Đang xử lý request /68gblon (Phiên bản JSON Tùy Chỉnh)...");
   const result = await fetchData();
   
   if (!result.success) {
@@ -752,15 +752,12 @@ app.get('/68gblon', async (req, res) => {
     validEntries.slice(-50).forEach(([k, v]) => jsonApiData[k] = v);
 
     res.json({
-      "json api": jsonApiData,
       "phiên": lastKey,
       "kết quả xúc xắc": lastSession.dices,
       "phiên hiện tại": lastSession,
       "dự đoán": analysis.prediction,
-      "pattern": analysis.details.neuralPattern.pattern,
       "loại cầu": analysis.loaiCau,
-      "id": "@sewdangcap",
-      "al chuyên gia phân tích tài xỉu": analysis.reasoning
+      "id": "@sewdangcap"
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Lỗi phân tích', error: error.message });
