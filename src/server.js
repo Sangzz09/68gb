@@ -621,7 +621,7 @@ class TaiXiuExpertAnalyzerV3 {
       .slice(0, 3)
       .map(a => a.name);
 
-    let reason = `AI Chuyên Gia dự đoán ${quantum.prediction} (Tỉ lệ ${quantum.confidence}%) dựa trên tín hiệu từ: ${topAlgos.join(', ')}.`;
+    let reason = `AI Chuyên Gia (VIP) dự đoán ${quantum.prediction} (Tỉ lệ ${quantum.confidence}%) dựa trên tín hiệu từ: ${topAlgos.join(', ')}.`;
     if (streak.length >= 4) reason += ` Cảnh báo cầu bệt ${streak.type} dài ${streak.length} phiên.`;
     return reason;
   }
@@ -716,6 +716,8 @@ app.get('/api/analyze', async (req, res) => {
 });
 
 app.get('/68gblon', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  console.log("⚡ Đang xử lý request /68gblon (Phiên bản Tiếng Việt)...");
   const result = await fetchData();
   
   if (!result.success) {
@@ -735,7 +737,7 @@ app.get('/68gblon', async (req, res) => {
       const debugData = {};
       entries.slice(-20).forEach(([k, v]) => debugData[k] = v);
       return res.json({ 
-        message: "Không tìm thấy trường 'dices[]' hợp lệ. Đây là dữ liệu gốc nhận được:", 
+        "thông báo": "Không tìm thấy trường 'dices[]' hợp lệ. Đây là dữ liệu gốc nhận được:", 
         sample_data: debugData 
       });
     }
@@ -750,15 +752,15 @@ app.get('/68gblon', async (req, res) => {
     validEntries.slice(-50).forEach(([k, v]) => jsonApiData[k] = v);
 
     res.json({
-      "json_api": jsonApiData,
+      "json api": jsonApiData,
       "phiên": lastKey,
       "kết quả xúc xắc": lastSession.dices,
       "phiên hiện tại": lastSession,
       "dự đoán": analysis.prediction,
       "pattern": analysis.details.neuralPattern.pattern,
       "loại cầu": analysis.loaiCau,
-      "al chuyên gia phân tích": analysis.reasoning,
-      "id": "@sewdangcap"
+      "id": "@sewdangcap",
+      "al chuyên gia phân tích tài xỉu": analysis.reasoning
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Lỗi phân tích', error: error.message });
