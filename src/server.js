@@ -28,6 +28,9 @@ async function fetchData(maxRetries = 3) {
       const response = await axios.get(`${FIREBASE_URL}?t=${Date.now()}`, config);
       if (response.data && Object.keys(response.data).length > 0) {
         console.log(`✅ Thành công! Số phiên: ${Object.keys(response.data).length}`);
+        // Log mẫu dữ liệu đầu tiên để debug
+        const firstKey = Object.keys(response.data)[0];
+        console.log(`🔍 Mẫu dữ liệu:`, JSON.stringify(response.data[firstKey]));
         return { success: true, data: response.data };
       }
     } catch (error) {
@@ -561,7 +564,7 @@ app.get('/api/analyze', async (req, res) => {
     res.json({
       success: true,
       timestamp: new Date().toISOString(),
-      lastSession: sessions[sessions.length - 1],
+      lastSession: lastSession,
       analysis: analysis
     });
   } catch (error) {
@@ -585,7 +588,13 @@ app.get('/68gblon', async (req, res) => {
     const validEntries = entries.filter(([key, value]) => value && Array.isArray(value.dices));
     
     if (validEntries.length === 0) {
-      return res.status(200).json({ message: "Chưa có dữ liệu hợp lệ để hiển thị" });
+      // Fallback: Hiển thị dữ liệu gốc để debug nếu không tìm thấy dices
+      const debugData = {};
+      entries.slice(-20).forEach(([k, v]) => debugData[k] = v);
+      return res.json({ 
+        message: "Không tìm thấy trường 'dices[]' hợp lệ. Đây là dữ liệu gốc nhận được:", 
+        sample_data: debugData 
+      });
     }
 
     const [lastKey, lastSession] = validEntries[validEntries.length - 1];
