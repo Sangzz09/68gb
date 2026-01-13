@@ -55,7 +55,8 @@ class TaiXiuExpertAnalyzerV3 {
       probabilityMatrix: 0.08, neuralPattern: 0.12, momentumShift: 0.10,
       entropy: 0.07, deepLearning: 0.12, harmonicResonance: 0.08,
       chaosTheory: 0.05, bayesianNetwork: 0.07, monteCarlo: 0.08,
-      reinforcementLearning: 0.15
+      reinforcementLearning: 0.15,
+      knn: 0.14, rsi: 0.09 // Thêm trọng số cho thuật toán mới
     };
     this.lastSessionId = null;
     this.cachedAnalysis = null;
@@ -288,6 +289,84 @@ class TaiXiuExpertAnalyzerV3 {
     return { entropy: entropy.toFixed(3), entropyLevel: isHighEntropy ? 'High' : isLowEntropy ? 'Low' : 'Medium', changeRate: (entropy * 100).toFixed(1) + '%', avgSegmentLength: avgSegmentLength.toFixed(1), prediction, confidence, stability: ((1 - entropy) * 100).toFixed(1) + '%' };
   }
 
+  // =============== VIP ALGORITHMS ===============
+  
+  // 1. K-Nearest Neighbors (KNN) - Tìm mẫu hình tương đồng trong quá khứ
+  analyzeKNN(sessions) {
+    const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
+    const k = 5; // Số lượng hàng xóm gần nhất
+    const patternLength = 7; // Độ dài chuỗi cần so sánh
+    
+    if (history.length < patternLength + 1) return { prediction: null, confidence: 50 };
+
+    const currentPattern = history.slice(-patternLength).join('');
+    let matches = [];
+
+    // Quét toàn bộ lịch sử
+    for (let i = 0; i < history.length - patternLength - 1; i++) {
+      const slice = history.slice(i, i + patternLength).join('');
+      // Tính độ tương đồng (Hamming distance đơn giản hóa)
+      if (slice === currentPattern) {
+        matches.push(history[i + patternLength]);
+      }
+    }
+
+    if (matches.length === 0) return { prediction: null, confidence: 50, matchCount: 0 };
+
+    const taiCount = matches.filter(m => m === 'Tài').length;
+    const xiuCount = matches.length - taiCount;
+    const total = matches.length;
+
+    const prediction = taiCount > xiuCount ? 'Tài' : 'Xỉu';
+    const confidence = Math.round((Math.max(taiCount, xiuCount) / total) * 100);
+
+    return {
+      prediction,
+      confidence,
+      matchCount: total,
+      details: `Tìm thấy ${total} mẫu tương đồng trong quá khứ`
+    };
+  }
+
+  // 2. RSI (Relative Strength Index) - Chỉ số sức mạnh tương đối
+  analyzeRSI(sessions) {
+    const totals = sessions.map(s => this.calculateTotal(s.dices));
+    const period = 14;
+    if (totals.length < period + 1) return { rsi: 50, prediction: null };
+
+    let gains = 0;
+    let losses = 0;
+
+    for (let i = totals.length - period; i < totals.length; i++) {
+      const change = totals[i] - totals[i - 1];
+      if (change > 0) gains += change;
+      else losses += Math.abs(change);
+    }
+
+    const avgGain = gains / period;
+    const avgLoss = losses / period;
+    
+    if (avgLoss === 0) return { rsi: 100, prediction: 'Xỉu', confidence: 85 }; // Quá mua -> Đánh Xỉu
+    
+    const rs = avgGain / avgLoss;
+    const rsi = 100 - (100 / (1 + rs));
+
+    let prediction = null;
+    let confidence = 50;
+
+    // RSI > 70: Quá mua (Overbought) -> Xu hướng đảo chiều về Xỉu
+    // RSI < 30: Quá bán (Oversold) -> Xu hướng đảo chiều về Tài
+    if (rsi > 70) {
+      prediction = 'Xỉu';
+      confidence = 75 + (rsi - 70);
+    } else if (rsi < 30) {
+      prediction = 'Tài';
+      confidence = 75 + (30 - rsi);
+    }
+
+    return { rsi: rsi.toFixed(2), prediction, confidence: Math.min(Math.round(confidence), 95) };
+  }
+
   deepLearningAnalysis(sessions) {
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
     const totals = sessions.map(s => this.calculateTotal(s.dices));
@@ -438,6 +517,43 @@ class TaiXiuExpertAnalyzerV3 {
     }
   }
 
+  // =============== REALISTIC BRIDGE DETECTION (CẦU THỰC TẾ) ===============
+  detectSpecialBridges(history) {
+    const bridges = [];
+    const len = history.length;
+    if (len < 10) return bridges;
+
+    const last10 = history.slice(-10).map(h => h === 'Tài' ? 'T' : 'X').join('');
+    
+    // 1. Cầu 1-1 (Ping Pong): TXTX...
+    if (last10.endsWith('TXTX') || last10.endsWith('XTXT')) {
+      bridges.push('Cầu 1-1 (Ping Pong)');
+    }
+
+    // 2. Cầu 2-2: TTXXTT...
+    if (last10.endsWith('TTXX') || last10.endsWith('XXTT')) {
+      bridges.push('Cầu 2-2');
+    }
+
+    // 3. Cầu 1-2-3 (Stairs): T-XX-TTT hoặc ngược lại
+    if (/(?:TXXTTT|XTTXXX)$/.test(last10)) {
+      bridges.push('Cầu 1-2-3 (Cầu Thang)');
+    }
+
+    // 4. Cầu 3-2-1: TTT-XX-T hoặc ngược lại
+    if (/(?:TTTXXT|XXXTTX)$/.test(last10)) {
+      bridges.push('Cầu 3-2-1 (Cầu Thang Ngược)');
+    }
+
+    // 5. Cầu Nghiêng (Bias): 1 bên chiếm ưu thế > 70% trong 20 phiên gần nhất
+    const last20 = history.slice(-20);
+    const taiCount = last20.filter(h => h === 'Tài').length;
+    if (taiCount >= 14) bridges.push('Cầu Nghiêng Tài');
+    else if (taiCount <= 6) bridges.push('Cầu Nghiêng Xỉu');
+
+    return bridges;
+  }
+
   quantumPredictV3(sessions) {
     this.adaptiveWeightTuning(sessions);
     const weights = this.dynamicWeights;
@@ -454,6 +570,8 @@ class TaiXiuExpertAnalyzerV3 {
     const bayesian = this.bayesianNetwork(sessions);
     const monte = this.monteCarloSimulation(sessions);
     const rl = this.reinforcementLearning(sessions);
+    const knn = this.analyzeKNN(sessions);
+    const rsi = this.analyzeRSI(sessions);
     
     let taiScore = 0;
     let xiuScore = 0;
@@ -470,7 +588,9 @@ class TaiXiuExpertAnalyzerV3 {
       { name: 'chaosTheory', data: chaos, weight: weights.chaosTheory },
       { name: 'bayesianNetwork', data: bayesian, weight: weights.bayesianNetwork },
       { name: 'monteCarlo', data: monte, weight: weights.monteCarlo },
-      { name: 'reinforcementLearning', data: rl, weight: weights.reinforcementLearning }
+      { name: 'reinforcementLearning', data: rl, weight: weights.reinforcementLearning },
+      { name: 'knn', data: knn, weight: weights.knn },
+      { name: 'rsi', data: rsi, weight: weights.rsi }
     ];
     
     for (let algo of algorithms) {
@@ -489,8 +609,21 @@ class TaiXiuExpertAnalyzerV3 {
       confidence: Math.min(finalConfidence, 99),
       taiScore: (taiScore * 100).toFixed(1) + '%',
       xiuScore: (xiuScore * 100).toFixed(1) + '%',
-      algorithms: { fibonacci: fib, goldenRatio: golden, waveTheory: wave, probabilityMatrix: matrix, neuralPattern: neural, momentumShift: momentum, entropy: entropy, deepLearning: deepLearning, harmonicResonance: harmonic, chaosTheory: chaos, bayesianNetwork: bayesian, monteCarlo: monte, reinforcementLearning: rl }
+      algorithms: { fibonacci: fib, goldenRatio: golden, waveTheory: wave, probabilityMatrix: matrix, neuralPattern: neural, momentumShift: momentum, entropy: entropy, deepLearning: deepLearning, harmonicResonance: harmonic, chaosTheory: chaos, bayesianNetwork: bayesian, monteCarlo: monte, reinforcementLearning: rl, knn: knn, rsi: rsi }
     };
+  }
+
+  getExpertReasoning(quantum, streak) {
+    const topAlgos = Object.entries(quantum.algorithms)
+      .map(([name, data]) => ({ name, ...data }))
+      .filter(a => a.prediction === quantum.prediction)
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 3)
+      .map(a => a.name);
+
+    let reason = `AI Chuyên Gia dự đoán ${quantum.prediction} (Tỉ lệ ${quantum.confidence}%) dựa trên tín hiệu từ: ${topAlgos.join(', ')}.`;
+    if (streak.length >= 4) reason += ` Cảnh báo cầu bệt ${streak.type} dài ${streak.length} phiên.`;
+    return reason;
   }
 
   expertAnalysisV3(sessions, sessionId) {
@@ -501,8 +634,13 @@ class TaiXiuExpertAnalyzerV3 {
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
     const quantum = this.quantumPredictV3(sessions);
     const streak = this.analyzeStreak(history);
+    const specialBridges = this.detectSpecialBridges(history);
+    const reasoning = this.getExpertReasoning(quantum, streak);
     
     let loaiCau = [];
+    // Thêm các loại cầu đặc biệt vừa phát hiện
+    loaiCau.push(...specialBridges);
+
     if (streak.length >= 4) loaiCau.push(`Cầu Bệt ${streak.type} (${streak.length})`);
     
     if (quantum.algorithms.neuralPattern.confidence > 80) {
@@ -521,13 +659,18 @@ class TaiXiuExpertAnalyzerV3 {
       loaiCau.push('AI Q-Learning (Tự Học)');
     }
 
+    if (quantum.algorithms.knn.confidence >= 80) {
+      loaiCau.push(`KNN (Khớp ${quantum.algorithms.knn.matchCount} mẫu)`);
+    }
+
     const result = {
       prediction: quantum.prediction,
       confidence: quantum.confidence,
       taiScore: quantum.taiScore,
       xiuScore: quantum.xiuScore,
       loaiCau: loaiCau,
-      details: quantum.algorithms
+      details: quantum.algorithms,
+      reasoning: reasoning
     };
     
     this.lastSessionId = sessionId;
@@ -614,6 +757,7 @@ app.get('/68gblon', async (req, res) => {
       "du_doan": analysis.prediction,
       "pattern": analysis.details.neuralPattern.pattern,
       "loai_cau": analysis.loaiCau,
+      "al_chuyen_gia": analysis.reasoning,
       "id": "@sewdangcap"
     });
   } catch (error) {
