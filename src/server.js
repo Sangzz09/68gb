@@ -30,7 +30,7 @@ async function fetchData(maxRetries = 3) {
         }
       };
       
-      const response = await axios.get(FIREBASE_URL, config);
+      const response = await axios.get(`${FIREBASE_URL}?t=${Date.now()}`, config);
       
       if (response.data && Object.keys(response.data).length > 0) {
         console.log(`✅ Thành công! Số phiên: ${Object.keys(response.data).length}`);
@@ -74,6 +74,10 @@ class TaiXiuExpertAnalyzerV3 {
       chaosTheory: 0.05, bayesianNetwork: 0.07, monteCarlo: 0.08,
       reinforcementLearning: 0.15 // Trọng số cao cho AI tự học
     };
+    
+    // Cache dự đoán (1 phiên 1 lần)
+    this.lastSessionId = null;
+    this.cachedAnalysis = null;
   }
 
   calculateTotal(dices) {
@@ -760,7 +764,11 @@ class TaiXiuExpertAnalyzerV3 {
     };
   }
 
-  expertAnalysisV3(sessions) {
+  expertAnalysisV3(sessions, sessionId) {
+    if (sessionId && this.lastSessionId === sessionId && this.cachedAnalysis) {
+      return this.cachedAnalysis;
+    }
+
     const history = sessions.map(s => this.getTaiXiu(this.calculateTotal(s.dices)));
     const quantum = this.quantumPredictV3(sessions);
     const streak = this.analyzeStreak(history);
@@ -806,7 +814,7 @@ class TaiXiuExpertAnalyzerV3 {
       loaiCau.push('AI Q-Learning (Tự Học)');
     }
 
-    return {
+    const result = {
       prediction: quantum.prediction,
       confidence: quantum.confidence,
       taiScore: quantum.taiScore,
@@ -814,6 +822,10 @@ class TaiXiuExpertAnalyzerV3 {
       loaiCau: loaiCau,
       details: quantum.algorithms
     };
+    
+    this.lastSessionId = sessionId;
+    this.cachedAnalysis = result;
+    return result;
   }
 }
 
@@ -834,10 +846,11 @@ app.get('/api/analyze', async (req, res) => {
   try {
     // Chuyển đổi dữ liệu từ object sang array
     const sessions = Object.values(result.data);
+    const lastKey = Object.keys(result.data).pop();
     // Lấy 100 phiên gần nhất để phân tích
     const recentSessions = sessions.slice(-100);
     
-    const analysis = analyzer.expertAnalysisV3(recentSessions);
+    const analysis = analyzer.expertAnalysisV3(recentSessions, lastKey);
     
     res.json({
       success: true,
@@ -869,7 +882,7 @@ app.get('/68gblon', async (req, res) => {
     const lastKey = keys[keys.length - 1];
     const lastSession = sessions[sessions.length - 1];
     
-    const analysis = analyzer.expertAnalysisV3(recentSessions);
+    const analysis = analyzer.expertAnalysisV3(recentSessions, lastKey);
     
     res.json({
       "json_api": result.data,
